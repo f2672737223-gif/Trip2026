@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>岡山×倉敷×高松 2026 行程看板</title>
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --card-bg: #ffffff;
+      --primary: #1e88e5;
+      --primary-light: #e3f2fd;
+      --text: #2c3e50;
+      --text-sub: #7f8c8d;
+      --accent: #e74c3c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0; padding: 12px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .header {
+      background: var(--primary);
+      color: white; padding: 16px;
+      border-radius: 12px; margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header h1 { margin: 0; font-size: 1.2rem; outline: none; }
+    .header .sub { font-size: 0.8rem; opacity: 0.9; margin-top: 4px; outline: none; }
+    
+    .tabs-wrapper { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+    .tabs { display: flex; gap: 6px; overflow-x: auto; flex: 1; padding-bottom: 4px; }
+    .tab-btn {
+      background: white; border: 1px solid #cbd5e1;
+      padding: 8px 12px; border-radius: 20px; font-size: 0.85rem;
+      font-weight: 600; color: var(--text-sub); flex-shrink: 0; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .card {
+      background: var(--card-bg); border-radius: 12px;
+      padding: 14px; margin-bottom: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .card-title {
+      font-size: 1rem; font-weight: bold; margin-bottom: 12px;
+      padding-bottom: 6px; border-bottom: 2px solid var(--primary-light);
+      outline: none; color: var(--primary);
+    }
+    .item-row {
+      display: flex; gap: 8px; margin-bottom: 12px; padding-bottom: 10px;
+      border-bottom: 1px dashed #e2e8f0; align-items: flex-start;
+    }
+    .item-time { font-weight: bold; color: var(--primary); width: 48px; font-size: 0.85rem; outline: none; flex-shrink: 0; }
+    .item-main { flex: 1; }
+    .item-name { font-weight: 600; font-size: 0.9rem; outline: none; margin-bottom: 2px; }
+    .item-note { font-size: 0.78rem; color: var(--text-sub); outline: none; line-height: 1.3; }
+    .item-cost { font-size: 0.8rem; font-weight: bold; color: #d35400; outline: none; text-align: right; width: 65px; flex-shrink: 0; }
+    .item-ops { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+    
+    .btn-small {
+      background: #f1f5f9; border: none; padding: 4px 6px;
+      border-radius: 4px; font-size: 0.72rem; color: #475569; cursor: pointer; text-decoration: none; text-align: center;
+    }
+    .btn-del { color: var(--accent); }
+
+    .btn-block {
+      width: 100%; background: var(--primary-light); color: var(--primary);
+      border: 1px solid var(--primary); padding: 10px; border-radius: 8px;
+      font-weight: bold; font-size: 0.85rem; cursor: pointer; margin-top: 6px;
+    }
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); color: white; padding: 8px 16px;
+      border-radius: 20px; font-size: 0.85rem; display: none; z-index: 1000;
+    }
+    .footer-tools { display: flex; gap: 8px; margin-top: 16px; }
+    .footer-tools button { flex: 1; }
+
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); z-index: 999; justify-content: center; align-items: center; padding: 16px;
+    }
+    .modal-box { background: white; padding: 16px; border-radius: 12px; width: 100%; max-width: 400px; }
+    .modal-box textarea { width: 100%; height: 140px; margin: 8px 0; padding: 8px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部旅程標題 -->
+  <div class="header">
+    <h1 contenteditable="true" onblur="saveData()" id="trip-title">岡山 × 倉敷 × 高松 2026</h1>
+    <div class="sub" contenteditable="true" onblur="saveData()" id="trip-sub">10/16 (五) ~ 10/20 (二) 情侶 5天4夜自由行</div>
+  </div>
+
+  <!-- 天數切換頁籤 -->
+  <div class="tabs-wrapper">
+    <div class="tabs" id="tabs-container"></div>
+  </div>
+
+  <!-- 主要行程內容 -->
+  <div id="day-content"></div>
+
+  <!-- 當日預估費用小計 -->
+  <div class="card" style="text-align: right; font-weight: bold; color: var(--primary); font-size: 0.9rem;">
+    預估當日個人費用合計：<span id="day-total" style="color:#d35400; font-size: 1.05rem;">0</span> 円
+  </div>
+
+  <button class="btn-block" onclick="addItem()">+ 新增行程地點</button>
+  <button class="btn-block" style="background:#fff3cd; color:#856404; border-color:#ffeba2;" onclick="resetToDocData()">🔄 強制載入 Google Doc 最新行程</button>
+
+  <div class="footer-tools">
+    <button class="btn-block" style="background:#eef2ff; color:#4f46e5; border-color:#4f46e5;" onclick="shareText()">📤 分享給伴侶 (LINE)</button>
+    <button class="btn-block" style="background:#fdf2f8; color:#db2777; border-color:#db2777;" onclick="openBackup()">💾 備份與還原</button>
+  </div>
+
+  <!-- JSON 備份視窗 -->
+  <div id="backupModal" class="modal">
+    <div class="modal-box">
+      <h3>備份與還原 (JSON)</h3>
+      <textarea id="jsonArea"></textarea>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-block" onclick="copyJSON()">複製文字</button>
+        <button class="btn-block" style="background:#27ae60; color:white;" onclick="restoreJSON()">還原內容</button>
+      </div>
+      <button class="btn-block" style="background:#ccc; color:#333; margin-top:6px;" onclick="closeBackup()">關閉</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // 確確實實匯入 Google Doc 的 5 天行程資料
+    const docData = {
+      title: "岡山 × 倉敷 × 高松 2026",
+      sub: "10/16 (五) ~ 10/20 (二) 情侶 5天4夜自由行",
+      days: [
+        {
+          label: "DAY 1 (10/16 五) 抵達岡山 & 市區散策",
+          items: [
+            { t: "11:30", n: "桃園機場 T1 起飛", note: "Tigerair IT214，提前 2.5 小時 Check-in", c: "0" },
+            { t: "15:05", n: "抵達岡山桃太郎機場", note: "入境／領行李預留約 45~60 分鐘", c: "0" },
+            { t: "16:00", n: "搭乘機場巴士", note: "岡山空港利木津巴士至岡山站西口 (車程約 30 分)", c: "1150" },
+            { t: "17:00", n: "飯店 Check-in", note: "岡山站附近飯店，擺放行李稍作休息", c: "0" },
+            { t: "17:45", n: "AEON MALL Okayama", note: "逛女裝、美妝、生活用品、雜貨", c: "0" },
+            { t: "18:30", n: "Bic Camera 購物", note: "逛電玩、動漫、玩具、3C 周邊", c: "0" },
+            { t: "19:15", n: "晚餐：味司野村", note: "必吃岡山名物：デミカツ丼 (濃郁醬汁豬排丼)", c: "1500" },
+            { t: "20:30", n: "岡山站周邊散步", note: "拍照看桃太郎裝置、便利商店採買隔天早餐", c: "500" }
+          ]
+        },
+        {
+          label: "DAY 2 (10/17 六) 吉備津神社 & 倉敷美觀 & Outlet",
+          items: [
+            { t: "08:00", n: "岡山站 -> 吉備津站", note: "搭乘 JR 桃太郎線 (約 20~30 分)", c: "240" },
+            { t: "08:30", n: "吉備津神社 參拜", note: "必拍重點：398m 木造迴廊、桃太郎傳說文化", c: "0" },
+            { t: "10:00", n: "吉備津 -> 倉敷站", note: "搭乘 JR 前往倉敷，下車後步行 10~15 分至美觀", c: "330" },
+            { t: "10:45", n: "倉敷美觀地區 散策", note: "倉敷川、中橋拍照，逛白壁街道、如竹堂紙膠帶", c: "0" },
+            { t: "13:00", n: "午餐：三宅商店", note: "必吃招牌咖哩飯 & 季節限定甜點 (如竹堂旁)", c: "1500" },
+            { t: "14:30", n: "三井 Outlet Park 倉敷", note: "倉敷站旁，逛運動品牌、球鞋、服飾與雜貨", c: "0" },
+            { t: "16:30", n: "倉敷站咖啡廳休息", note: "走累了喝咖啡、吃甜點小憩", c: "800" },
+            { t: "19:30", n: "搭 JR 返回岡山飯店", note: "車程約 15~20 分鐘", c: "330" }
+          ]
+        },
+        {
+          label: "DAY 3 (10/18 日) 跨海高松一日遊 & Marine Liner",
+          items: [
+            { t: "08:24", n: "岡山站 -> 高松站", note: "搭乘 Marine Liner (記得看窗外瀨戶大橋海景！)", c: "1530" },
+            { t: "10:00", n: "栗林公園 散策", note: "米其林三星日式庭園，漫步欣賞池塘與松樹", c: "410" },
+            { t: "11:30", n: "午餐：うどんバカ一代", note: "高松必吃讚岐烏龍麵！招牌：釜バター (奶油烏龍)", c: "800" },
+            { t: "12:45", n: "高松丸龜町商店街", note: "逛女裝、美妝、動漫、球鞋與咖啡館", c: "0" },
+            { t: "15:00", n: "玉藻公園 / 高松城跡", note: "日本三大海城之一，欣賞水堀與城跡海景", c: "200" },
+            { t: "16:15", n: "高松港 散步拍照", note: "欣賞港口、海景與渡輪", c: "0" },
+            { t: "17:10", n: "高松站 -> 岡山站", note: "搭乘 Marine Liner 返回岡山", c: "1530" },
+            { t: "18:30", n: "晚餐：岡山千屋牛 / 和牛", note: "慶祝跨海之旅！享用高級和牛燒肉大餐", c: "6000" }
+          ]
+        },
+        {
+          label: "DAY 4 (10/19 一) 岡山城 & 動漫購物 & 生日大餐",
+          items: [
+            { t: "09:30", n: "岡山城 (烏城) 巡禮", note: "搭乘路面電車至「城下站」，步行 5 分鐘", c: "400" },
+            { t: "11:30", n: "表町商店街 散步午餐", note: "探索老街特色店面與午餐美味", c: "1200" },
+            { t: "14:00", n: "Surugaya (駿河屋) & Animate", note: "動漫精品、二手模型周邊與扭蛋巡禮", c: "0" },
+            { t: "17:30", n: "生日甜點 & 千屋牛生日晚宴", note: "生日驚喜甜點與精緻和牛饗宴 🎉", c: "8000" }
+          ]
+        },
+        {
+          label: "DAY 5 (10/20 二) 伴手禮大採購 & 返台",
+          items: [
+            { t: "09:30", n: "さんすて岡山 採買伴手禮", note: "岡山站內商場最後爆買伴手禮與零食", c: "0" },
+            { t: "11:30", n: "早午餐 & 飯店拿行李", note: "享用美味早午餐，準備前往機場巴士站", c: "1500" },
+            { t: "13:00", n: "岡山站 -> 岡山機場", note: "搭乘機場巴士至岡山桃太郎機場", c: "1150" },
+            { t: "15:55", n: "岡山機場起飛 (虎航 IT215)", note: "平安返回桃園機場 T1 (預計 17:40 抵達)", c: "0" }
+          ]
+        }
+      ]
+    };
+
+    let appData = docData;
+    let currentDayIdx = 0;
+
+    window.onload = function() {
+      // 改用 trip_v2026 強制更新，避免讀到手機舊的範例快取
+      const saved = localStorage.getItem('trip_v2026');
+      if (saved) {
+        try { appData = JSON.parse(saved); } catch(e){ appData = docData; }
+      } else {
+        appData = docData;
+        localStorage.setItem('trip_v2026', JSON.stringify(appData));
+      }
+      render();
+    };
+
+    function resetToDocData() {
+      appData = docData;
+      localStorage.setItem('trip_v2026', JSON.stringify(appData));
+      render();
+      showToast("已成功載入 Google Doc 5 天完整行程！");
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg; t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 2000);
+    }
+
+    function saveData() {
+      appData.title = document.getElementById('trip-title').innerText;
+      appData.sub = document.getElementById('trip-sub').innerText;
+      localStorage.setItem('trip_v2026', JSON.stringify(appData));
+      renderTotal();
+    }
+
+    function render() {
+      document.getElementById('trip-title').innerText = appData.title;
+      document.getElementById('trip-sub').innerText = appData.sub;
+
+      const tabsEl = document.getElementById('tabs-container');
+      tabsEl.innerHTML = '';
+      appData.days.forEach((day, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${idx === currentDayIdx ? 'active' : ''}`;
+        btn.innerText = `Day ${idx+1}`;
+        btn.onclick = () => { currentDayIdx = idx; render(); };
+        tabsEl.appendChild(btn);
+      });
+
+      const contentEl = document.getElementById('day-content');
+      const curDay = appData.days[currentDayIdx];
+      if (!curDay) return;
+
+      let html = `<div class="card">
+        <div class="card-title" contenteditable="true" onblur="updateDayLabel(this.innerText)">${curDay.label}</div>`;
+      
+      curDay.items.forEach((item, itemIdx) => {
+        html += `
+          <div class="item-row">
+            <div class="item-time" contenteditable="true" onblur="updateItem(${itemIdx}, 't', this.innerText)">${item.t}</div>
+            <div class="item-main">
+              <div class="item-name" contenteditable="true" onblur="updateItem(${itemIdx}, 'n', this.innerText)">${item.n}</div>
+              <div class="item-note" contenteditable="true" onblur="updateItem(${itemIdx}, 'note', this.innerText)">${item.note || '無備註'}</div>
+            </div>
+            <div class="item-cost" contenteditable="true" onblur="updateItem(${itemIdx}, 'c', this.innerText)">${item.c || 0}円</div>
+            <div class="item-ops">
+              <a class="btn-small" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.n)}" target="_blank">📍地圖</a>
+              <button class="btn-small btn-del" onclick="deleteItem(${itemIdx})">🗑</button>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      contentEl.innerHTML = html;
+
+      renderTotal();
+    }
+
+    function renderTotal() {
+      const curDay = appData.days[currentDayIdx];
+      let total = 0;
+      if (curDay) {
+        curDay.items.forEach(i => total += (parseInt(i.c) || 0));
+      }
+      document.getElementById('day-total').innerText = total.toLocaleString();
+    }
+
+    function updateDayLabel(val) {
+      appData.days[currentDayIdx].label = val;
+      saveData();
+    }
+
+    function updateItem(idx, key, val) {
+      let cleanVal = val.replace('円', '').trim();
+      appData.days[currentDayIdx].items[idx][key] = cleanVal;
+      if (key === 't') {
+        appData.days[currentDayIdx].items.sort((a,b) => a.t.localeCompare(b.t));
+        render();
+      }
+      saveData();
+    }
+
+    function addItem() {
+      appData.days[currentDayIdx].items.push({ t: "12:00", n: "新行程地點", note: "請輸入地點備註", c: "0" });
+      saveData(); render();
+    }
+
+    function deleteItem(idx) {
+      appData.days[currentDayIdx].items.splice(idx, 1);
+      saveData(); render(); showToast("已刪除該行程");
+    }
+
+    function shareText() {
+      let txt = `🗓️ ${appData.title} (${appData.sub})\n\n`;
+      appData.days.forEach(d => {
+        txt += `📌 ${d.label}\n`;
+        d.items.forEach(i => {
+          txt += `• ${i.t} ${i.n} (${i.c}円)\n  ${i.note}\n`;
+        });
+        txt += `\n`;
+      });
+      navigator.clipboard.writeText(txt);
+      showToast("已複製文字！可直接貼給女友");
+    }
+
+    function openBackup() {
+      document.getElementById('jsonArea').value = JSON.stringify(appData, null, 2);
+      document.getElementById('backupModal').style.display = 'flex';
+    }
+    function closeBackup() { document.getElementById('backupModal').style.display = 'none'; }
+    function copyJSON() {
+      navigator.clipboard.writeText(document.getElementById('jsonArea').value);
+      showToast("已複製 JSON 備份");
+    }
+    function restoreJSON() {
+      try {
+        const parsed = JSON.parse(document.getElementById('jsonArea').value);
+        appData = parsed; saveData(); render(); closeBackup();
+        showToast("還原成功！");
+      } catch(e) { showToast("JSON 格式錯誤"); }
+    }
+  </script>
+</body>
+</html>
